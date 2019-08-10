@@ -13,6 +13,15 @@ public class PlayerController : MonoBehaviourPun
     Quaternion sharedRot = Quaternion.identity;
     int shareCounter = 0;
 
+    Rigidbody rb;
+    float mass = 20000;
+    float thrust = 20000 * 15;
+    float density = 1.2f;
+    float dragCoefBase = 0.025f;
+    float liftCoefBase = 0.25f;
+    float area = 100;
+    float chord = 10;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -20,6 +29,7 @@ public class PlayerController : MonoBehaviourPun
         string tempString = "RPC Sent";
         photonView.RPC("TestRPC", RpcTarget.All, tempString);
 
+        rb = gameObject.GetComponent<Rigidbody>();
     }
 
     // Update is called once per frame
@@ -30,6 +40,36 @@ public class PlayerController : MonoBehaviourPun
 
     void FixedUpdate()
     {
+        Vector3 vel = rb.velocity;
+        Vector3 velNorm = rb.velocity.normalized;
+
+        float aoa = Vector3.Angle(rb.velocity.normalized, transform.rotation * Vector3.forward);
+        float aoaDot = Vector3.Dot(velNorm, transform.rotation * Vector3.back); //angle of attack where 1 is parallel and 0 is perpendicular.
+        float dynamPress = (density * vel.sqrMagnitude) / 2;
+
+        float dragCoef = dragCoefBase + -Mathf.Cos(2*Mathf.Deg2Rad*aoa) + 1;
+        float drag = dragCoef * dynamPress * area;
+        Vector3 dragDir = -velNorm;
+
+        float liftCoef = 0.1f*aoa;
+        if (liftCoef > 2)
+        {
+            liftCoef = 2;
+        }
+        float lift = liftCoef * dynamPress * area;
+        Vector3 liftDir = Vector3.ProjectOnPlane(transform.rotation * Vector3.forward, velNorm);
+
+        float momentCoef = 0.00004f * Mathf.Pow(aoa,2);
+        float moment = momentCoef * dynamPress * area * chord;
+        Vector3 momentDir = Vector3.Cross(transform.forward, velNorm);
+
+        rb.AddForce(drag * dragDir);
+        rb.AddForce(lift * liftDir);
+        rb.AddForce(transform.rotation * Vector3.forward * thrust);
+        rb.AddForce(mass * 9.8f * Vector3.forward);
+        rb.AddTorque(moment * momentDir -20000*rb.angularVelocity.normalized*rb.angularVelocity.sqrMagnitude); // Combination of natural aerodynamic stabilization and computer-aided-flight stabilization.
+
+
         if (photonView.IsMine)
         {
             float speed = 1f;
@@ -61,6 +101,7 @@ public class PlayerController : MonoBehaviourPun
             if (Input.GetKey(KeyCode.Space))
             {
                 player.transform.Translate(Vector3.up * speed);
+                //rb.AddForce(Vector3.up * speed);
             }
             if (Input.GetKey(KeyCode.C))
             {
@@ -77,11 +118,13 @@ public class PlayerController : MonoBehaviourPun
             }
             if (Input.GetKey(KeyCode.UpArrow))
             {
-                player.transform.Rotate(Vector3.right);
+                //player.transform.Rotate(Vector3.right);
+                rb.AddTorque(transform.right * 0.01f * dynamPress * area * chord);
             }
             if (Input.GetKey(KeyCode.DownArrow))
             {
-                player.transform.Rotate(Vector3.left);
+                //player.transform.Rotate(Vector3.left);
+                rb.AddTorque(-transform.right * 0.01f * dynamPress * area * chord);
             }
             if (Input.GetKey(KeyCode.LeftArrow))
             {
