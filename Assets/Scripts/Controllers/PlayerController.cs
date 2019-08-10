@@ -69,7 +69,6 @@ public class PlayerController : MonoBehaviourPun
         rb.AddForce(mass * 9.8f * Vector3.forward);
         rb.AddTorque(moment * momentDir -20000*rb.angularVelocity.normalized*rb.angularVelocity.sqrMagnitude); // Combination of natural aerodynamic stabilization and computer-aided-flight stabilization.
 
-        print(vel.magnitude);
 
         if (photonView.IsMine)
         {
